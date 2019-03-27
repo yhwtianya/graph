@@ -2,19 +2,22 @@ package g
 
 import (
 	"database/sql"
-	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"sync"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // TODO 草草的写了一个db连接池,优化下
 var (
 	dbLock    sync.RWMutex
-	dbConnMap map[string]*sql.DB
+	dbConnMap map[string]*sql.DB // 简单的mysql连接池
 )
 
+// mysql 连接
 var DB *sql.DB
 
+// 初始化DB、dbConnMap
 func InitDB() {
 	var err error
 	DB, err = makeDbConn()
@@ -40,6 +43,7 @@ func GetDbConn(connName string) (c *sql.DB, e error) {
 			return nil, err
 		}
 		dbConnMap[connName] = dbConn
+		// 这里可以有个return
 	}
 
 	err = dbConn.Ping()
@@ -60,11 +64,13 @@ func makeDbConn() (conn *sql.DB, err error) {
 	}
 
 	conn.SetMaxIdleConns(Config().DB.MaxIdle)
+	// 连通性
 	err = conn.Ping()
 
 	return conn, err
 }
 
+// 关闭mysql连接
 func closeDbConn(conn *sql.DB) {
 	if conn != nil {
 		conn.Close()

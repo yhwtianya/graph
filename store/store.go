@@ -12,22 +12,26 @@ import (
 	"github.com/open-falcon/graph/g"
 )
 
+// 内存中采用一致性哈希，保存所有的GraphItem
 var GraphItems *GraphItemMap
 
 type GraphItemMap struct {
 	sync.RWMutex
-	A    []map[string]*SafeLinkedList
-	Size int
+	A    []map[string]*SafeLinkedList //Size个map，防止单map过大，list元素类型为GraphItem
+	Size int                          // 初始化后不变
 }
 
+// 取key对应的list
 func (this *GraphItemMap) Get(key string) (*SafeLinkedList, bool) {
 	this.RLock()
 	defer this.RUnlock()
+	// key哈希值对Size取余，因为Size初始化后不变，构成一致性哈希
 	idx := hashKey(key) % uint32(this.Size)
 	val, ok := this.A[idx][key]
 	return val, ok
 }
 
+// 获取idx对应的map，并在GraphItemMap中置空
 func (this *GraphItemMap) Getitems(idx int) map[string]*SafeLinkedList {
 	this.RLock()
 	defer this.RUnlock()
@@ -36,6 +40,7 @@ func (this *GraphItemMap) Getitems(idx int) map[string]*SafeLinkedList {
 	return items
 }
 
+// 更新key对应的list
 func (this *GraphItemMap) Set(key string, val *SafeLinkedList) {
 	this.Lock()
 	defer this.Unlock()
@@ -43,6 +48,7 @@ func (this *GraphItemMap) Set(key string, val *SafeLinkedList) {
 	this.A[idx][key] = val
 }
 
+// 获取总list数量
 func (this *GraphItemMap) Len() int {
 	this.RLock()
 	defer this.RUnlock()
@@ -53,6 +59,7 @@ func (this *GraphItemMap) Len() int {
 	return l
 }
 
+// 获取key对应list的第一元素
 func (this *GraphItemMap) First(key string) *cmodel.GraphItem {
 	this.RLock()
 	defer this.RUnlock()
@@ -70,6 +77,7 @@ func (this *GraphItemMap) First(key string) *cmodel.GraphItem {
 	return first.Value.(*cmodel.GraphItem)
 }
 
+// 将items追加到key对应list中
 func (this *GraphItemMap) PushAll(key string, items []*cmodel.GraphItem) error {
 	this.Lock()
 	defer this.Unlock()
@@ -82,6 +90,7 @@ func (this *GraphItemMap) PushAll(key string, items []*cmodel.GraphItem) error {
 	return nil
 }
 
+// 获取key的list的flag
 func (this *GraphItemMap) GetFlag(key string) (uint32, error) {
 	this.Lock()
 	defer this.Unlock()
@@ -93,6 +102,7 @@ func (this *GraphItemMap) GetFlag(key string) (uint32, error) {
 	return sl.Flag, nil
 }
 
+// 更新key的list的flag
 func (this *GraphItemMap) SetFlag(key string, flag uint32) error {
 	this.Lock()
 	defer this.Unlock()
@@ -105,6 +115,7 @@ func (this *GraphItemMap) SetFlag(key string, flag uint32) error {
 	return nil
 }
 
+// 取出并清空对应key的所有GraphItem元素
 func (this *GraphItemMap) PopAll(key string) []*cmodel.GraphItem {
 	this.Lock()
 	defer this.Unlock()
@@ -128,6 +139,7 @@ func (this *GraphItemMap) FetchAll(key string) ([]*cmodel.GraphItem, uint32) {
 	return sl.FetchAll()
 }
 
+// 计算哈希
 func hashKey(key string) uint32 {
 	if len(key) < 64 {
 		var scratch [64]byte
@@ -142,23 +154,28 @@ func getWts(key string, now int64) int64 {
 	return now + interval - (int64(hashKey(key)) % interval)
 }
 
+// 将数据插入key对应list
 func (this *GraphItemMap) PushFront(key string,
 	item *cmodel.GraphItem, md5 string, cfg *g.GlobalConfig) {
 	if linkedList, exists := this.Get(key); exists {
+		// 在GraphItemMap存在，则直接插入
 		linkedList.PushFront(item)
 	} else {
+		// 不在GraphItemMap中则创建list保存
 		//log.Println("new key:", key)
 		safeList := &SafeLinkedList{L: list.New()}
 		safeList.L.PushFront(item)
 
 		if cfg.Migrate.Enabled && !g.IsRrdFileExist(g.RrdFileName(
 			cfg.RRD.Storage, md5, item.DsType, item.Step)) {
+			//如果Migrate.Enabled，且不存在对应rrd文件，则置Flag为GRAPH_F_MISS
 			safeList.Flag = g.GRAPH_F_MISS
 		}
 		this.Set(key, safeList)
 	}
 }
 
+// 获取idx索引下所有的key
 func (this *GraphItemMap) KeysByIndex(idx int) []string {
 	this.RLock()
 	defer this.RUnlock()
@@ -176,6 +193,7 @@ func (this *GraphItemMap) KeysByIndex(idx int) []string {
 	return keys
 }
 
+// 初始化GraphItems，GraphItems.Size为固定值
 func init() {
 	size := g.CACHE_TIME / g.FLUSH_DISK_STEP
 	if size < 0 {

@@ -28,7 +28,7 @@ type io_task_t struct {
 
 var (
 	Out_done_chan chan int
-	io_task_chan  chan *io_task_t
+	io_task_chan  chan *io_task_t // io_task任务队列
 )
 
 func init() {
@@ -71,17 +71,20 @@ func writeFile(filename string, data []byte, perm os.FileMode) error {
 	return err
 }
 
+//读取io_task_chan队列任务，执行io_task
 func ioWorker() {
 	var err error
 	for {
 		select {
 		case task := <-io_task_chan:
 			if task.method == IO_TASK_M_READ {
+				// 执行读文件任务
 				if args, ok := task.args.(*readfile_t); ok {
 					args.data, err = ioutil.ReadFile(args.filename)
 					task.done <- err
 				}
 			} else if task.method == IO_TASK_M_WRITE {
+				// 执行写文件任务
 				//filename must not exist
 				if args, ok := task.args.(*g.File); ok {
 					baseDir := file.Dir(args.Filename)

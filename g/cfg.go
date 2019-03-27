@@ -9,9 +9,10 @@ import (
 	"github.com/toolkits/file"
 )
 
+// 保存调用Graph.GetRrd的返回值的数据结构，rrd文件内容
 type File struct {
-	Filename string
-	Body     []byte
+	Filename string //文件路径
+	Body     []byte //文件内容
 }
 
 type HttpConfig struct {

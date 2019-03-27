@@ -19,10 +19,12 @@ func IsRrdFileExist(filename string) bool {
 	return file.IsExist(filename)
 }
 
-// 生成rrd缓存数据的key
+// 由md5、dsType、step生成rrd缓存数据的key
 func FormRrdCacheKey(md5 string, dsType string, step int) string {
 	return fmt.Sprintf("%s_%s_%d", md5, dsType, step)
 }
+
+// 由rrd缓存数据的key解析出md5、dsType、step
 func SplitRrdCacheKey(ckey string) (md5 string, dsType string, step int, err error) {
 	ckey_slice := strings.Split(ckey, "_")
 	if len(ckey_slice) != 3 {

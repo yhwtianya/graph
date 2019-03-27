@@ -10,7 +10,7 @@ import (
 type SafeLinkedList struct {
 	sync.RWMutex
 	Flag uint32
-	L    *list.List
+	L    *list.List // 元素类型为GraphItem
 }
 
 // 新创建SafeLinkedList容器
@@ -18,18 +18,21 @@ func NewSafeLinkedList() *SafeLinkedList {
 	return &SafeLinkedList{L: list.New()}
 }
 
+// 首部插入单元素
 func (this *SafeLinkedList) PushFront(v interface{}) *list.Element {
 	this.Lock()
 	defer this.Unlock()
 	return this.L.PushFront(v)
 }
 
+// 获得首元素
 func (this *SafeLinkedList) Front() *list.Element {
 	this.RLock()
 	defer this.RUnlock()
 	return this.L.Front()
 }
 
+// 获得并删除尾元素
 func (this *SafeLinkedList) PopBack() *list.Element {
 	this.Lock()
 	defer this.Unlock()
@@ -42,6 +45,7 @@ func (this *SafeLinkedList) PopBack() *list.Element {
 	return back
 }
 
+// 获得尾元素
 func (this *SafeLinkedList) Back() *list.Element {
 	this.Lock()
 	defer this.Unlock()
@@ -49,12 +53,14 @@ func (this *SafeLinkedList) Back() *list.Element {
 	return this.L.Back()
 }
 
+// 返回列表长度
 func (this *SafeLinkedList) Len() int {
 	this.RLock()
 	defer this.RUnlock()
 	return this.L.Len()
 }
 
+// 取出并清空所有元素(元素转为GraphItem结构)
 // remain参数表示要给linkedlist中留几个元素
 // 在cron中刷磁盘的时候要留一个，用于创建数据库索引
 // 在程序退出的时候要一个不留的全部刷到磁盘
@@ -78,6 +84,7 @@ func (this *SafeLinkedList) PopAll() []*cmodel.GraphItem {
 	return ret
 }
 
+// 尾部插入多个元素(元素转为GraphItem结构)
 //restore PushAll
 func (this *SafeLinkedList) PushAll(items []*cmodel.GraphItem) {
 	this.Lock()
@@ -91,6 +98,7 @@ func (this *SafeLinkedList) PushAll(items []*cmodel.GraphItem) {
 	}
 }
 
+// 获取所有元素和flag
 //return为倒叙的?
 func (this *SafeLinkedList) FetchAll() ([]*cmodel.GraphItem, uint32) {
 	this.Lock()
