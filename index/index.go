@@ -11,16 +11,20 @@ import (
 // 初始化索引功能模块
 func Start() {
 	InitCache()
+	// 周期性地将unIndexedItemCache记录的数据更新到数据库和IndexedItemCache
 	go StartIndexUpdateIncrTask()
 	log.Println("index.Start ok")
 }
 
-// index收到一条新上报的监控数据,尝试用于增量更新索引
+// index收到一条新上报的监控数据,尝试用于增量更新索引, Rpc Send调用这里
+// 更新缓存数据，方便快速获取item的最新属性
 func ReceiveItem(item *cmodel.GraphItem, md5 string) {
 	if item == nil {
 		return
 	}
 
+	// GraphItem的Endpoint、Metric、Tags构成md5sum
+	// GraphItem的Endpoint、Metric、Tags、DsType、Step构成UUID
 	uuid := item.UUID()
 
 	// 已上报过的数据
@@ -47,7 +51,7 @@ func ReceiveItem(item *cmodel.GraphItem, md5 string) {
 	unIndexedItemCache.Put(md5, NewIndexCacheItem(uuid, item))
 }
 
-//
+// 获取indexedItemCache中对应缓存数据
 func GetIndexedItemCache(endpoint string, metric string, tags map[string]string, dstype string, step int) (r *cmodel.GraphItem, rerr error) {
 	itemDemo := &cmodel.GraphItem{
 		Endpoint: endpoint,

@@ -29,6 +29,7 @@ func InitDB() {
 	log.Println("g.InitDB ok")
 }
 
+// 按名称获取mysql连接,如果名称对应的连接，没有则创建连接
 func GetDbConn(connName string) (c *sql.DB, e error) {
 	dbLock.Lock()
 	defer dbLock.Unlock()

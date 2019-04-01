@@ -94,7 +94,7 @@ func dial(address string, timeout time.Duration) (*rpc.Client, error) {
 	return rpc.NewClient(conn), err
 }
 
-// 启动数据迁移
+// 启动数据迁移协程，监听Net_task_ch，执行Net_task
 func migrate_start(cfg *g.GlobalConfig) {
 	var err error
 	var i int
@@ -124,6 +124,7 @@ func migrate_start(cfg *g.GlobalConfig) {
 	}
 }
 
+// 监听Net_task_ch，执行Net_task
 func net_task_worker(idx int, ch chan *Net_task_t, client **rpc.Client, addr string) {
 	var err error
 	for {
@@ -352,6 +353,7 @@ out:
 	return err
 }
 
+// 调用rpc method
 func rpc_call(client *rpc.Client, method string, args interface{},
 	reply interface{}, timeout time.Duration) error {
 	done := make(chan *rpc.Call, 1)

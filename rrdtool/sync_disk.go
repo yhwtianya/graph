@@ -27,7 +27,7 @@ type io_task_t struct {
 }
 
 var (
-	Out_done_chan chan int
+	Out_done_chan chan int        // 接收退出信号
 	io_task_chan  chan *io_task_t // io_task任务队列
 )
 
@@ -36,7 +36,9 @@ func init() {
 	io_task_chan = make(chan *io_task_t, 16)
 }
 
+// 定期FlushRRD，进行落盘
 func syncDisk() {
+	// 启动后不立即进行落盘
 	time.Sleep(time.Second * 300)
 	ticker := time.NewTicker(time.Millisecond * g.FLUSH_DISK_STEP).C
 	var idx int = 0
@@ -54,6 +56,7 @@ func syncDisk() {
 	}
 }
 
+// 写文件
 // WriteFile writes data to a file named by filename.
 // file must not exist
 func writeFile(filename string, data []byte, perm os.FileMode) error {
@@ -95,10 +98,12 @@ func ioWorker() {
 				}
 			} else if task.method == IO_TASK_M_FLUSH {
 				if args, ok := task.args.(*flushfile_t); ok {
+					// 将GraphItem数据追加到rrdfile
 					task.done <- flushrrd(args.filename, args.items)
 				}
 			} else if task.method == IO_TASK_M_FETCH {
 				if args, ok := task.args.(*fetch_t); ok {
+					// 直接从rrdfile读取某时间段的统计数据
 					args.data, err = fetch(args.filename, args.cf, args.start, args.end, args.step)
 					task.done <- err
 				}

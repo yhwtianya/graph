@@ -11,6 +11,7 @@ import (
 	"github.com/open-falcon/graph/g"
 )
 
+// 加锁的列表
 type conn_list struct {
 	sync.RWMutex
 	list *list.List
@@ -27,8 +28,8 @@ func (l *conn_list) remove(e *list.Element) net.Conn {
 	return l.list.Remove(e).(net.Conn)
 }
 
-var Close_chan, Close_done_chan chan int
-var connects conn_list
+var Close_chan, Close_done_chan chan int // rpc退出通道，优雅退出响应通道
+var connects conn_list                   //保存rpc accept的连接，用于退出时依次关闭rpc连接
 
 func init() {
 	Close_chan = make(chan int, 1)
@@ -36,6 +37,7 @@ func init() {
 	connects = conn_list{list: list.New()}
 }
 
+// 启动rpc服务
 func Start() {
 	if !g.Config().Rpc.Enabled {
 		log.Println("rpc.Start warning, not enabled")
@@ -60,6 +62,7 @@ func Start() {
 		var tempDelay time.Duration // how long to sleep on accept failure
 		for {
 			conn, err := listener.Accept()
+			// 失败时翻倍递增sleep时长，最大1s
 			if err != nil {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
@@ -83,6 +86,7 @@ func Start() {
 
 	select {
 	case <-Close_chan:
+		// 等待退出信号，优雅退出
 		log.Println("rpc, recv sigout and exiting...")
 		listener.Close()
 		Close_done_chan <- 1

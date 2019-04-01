@@ -49,10 +49,13 @@ func Start() {
 		log.Fatalln("rrdtool.Start error, bad data dir "+cfg.RRD.Storage+",", err)
 	}
 
+	// 启动数据迁移，监听Net_task_ch，执行Net_task
 	migrate_start(cfg)
 
+	// 定期FlushRRD，进行落盘
 	// sync disk
 	go syncDisk()
+	//读取io_task_chan队列任务，执行io_task
 	go ioWorker()
 	log.Println("rrdtool.Start ok")
 }
@@ -260,6 +263,7 @@ func CommitByKey(key string) {
 }
 
 // 对该key的pull任务放入任务队列，实现非阻塞执行pull
+// pull的作用是如果本地有对应rrdfile则将key对应的数据拉到本地进行落盘，此时如果落盘超时，将数据发送到其他graph
 func PullByKey(key string) {
 	done := make(chan error)
 

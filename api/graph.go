@@ -16,6 +16,7 @@ import (
 
 type Graph int
 
+// 将内存数据写入rrdfile,返回最新rrdfile的内容
 func (this *Graph) GetRrd(key string, rrdfile *g.File) (err error) {
 	if md5, dsType, step, err := g.SplitRrdCacheKey(key); err != nil {
 		return err
@@ -23,8 +24,10 @@ func (this *Graph) GetRrd(key string, rrdfile *g.File) (err error) {
 		rrdfile.Filename = g.RrdFileName(g.Config().RRD.Storage, md5, dsType, step)
 	}
 
+	// 取出并清空对应key的所有GraphItem元素
 	items := store.GraphItems.PopAll(key)
 	if len(items) > 0 {
+		// 将GraphItem数据追加到本地rrdfile
 		rrdtool.FlushFile(rrdfile.Filename, items)
 	}
 
@@ -32,6 +35,7 @@ func (this *Graph) GetRrd(key string, rrdfile *g.File) (err error) {
 	return
 }
 
+// 连通性
 func (this *Graph) Ping(req cmodel.NullRpcRequest, resp *cmodel.SimpleRpcResponse) error {
 	return nil
 }
@@ -74,10 +78,13 @@ func handleItems(items []*cmodel.GraphItem) {
 		// To Graph
 		first := store.GraphItems.First(key)
 		if first != nil && items[i].Timestamp <= first.Timestamp {
+			// 检查数据时间
 			continue
 		}
+		// 将数据插入key对应list,如果不存在key对应的rrdfile则置GRAPH_F_MISS flag
 		store.GraphItems.PushFront(key, items[i], checksum, cfg)
 
+		// 更新缓存数据，方便快速获取item的最新属性
 		// To Index
 		index.ReceiveItem(items[i], checksum)
 

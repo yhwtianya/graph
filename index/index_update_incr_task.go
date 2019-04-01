@@ -23,6 +23,7 @@ var (
 	semaUpdateIndexIncr = nsema.NewSemaphore(2) // 索引增量更新时操作mysql的并发控制
 )
 
+// 周期性地将unIndexedItemCache记录的数据更新到数据库和IndexedItemCache
 // 启动索引的 异步、增量更新 任务
 func StartIndexUpdateIncrTask() {
 	for {
@@ -38,6 +39,7 @@ func StartIndexUpdateIncrTask() {
 	}
 }
 
+// 将unIndexedItemCache记录的数据更新到数据库和IndexedItemCache
 // 进行一次增量更新
 func updateIndexIncr() int {
 	ret := 0
@@ -64,6 +66,7 @@ func updateIndexIncr() int {
 				if err != nil {
 					proc.IndexUpdateIncrErrorCnt.Incr()
 				} else {
+					// 将增量更新数据更新到indexedItemCache
 					indexedItemCache.Put(key, icitem)
 				}
 			}(key, icitem.(*IndexCacheItem), dbConn)
@@ -74,7 +77,7 @@ func updateIndexIncr() int {
 	return ret
 }
 
-//
+// 根据item，在endpoint、tag_endpoint、endpoint_counter表中创建或更新相应的记录
 func maybeUpdateIndexFromOneItem(item *cmodel.GraphItem, conn *sql.DB) error {
 	if item == nil {
 		return nil
@@ -83,6 +86,7 @@ func maybeUpdateIndexFromOneItem(item *cmodel.GraphItem, conn *sql.DB) error {
 	endpoint := item.Endpoint
 	ts := item.Timestamp
 	var endpointId int64 = -1
+	// ON DUPLICATE KEY UPDATE: 先判断一条记录是否存在，存在则update，否则insert
 	sqlDuplicateString := " ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), ts=VALUES(ts)" //第一个字符是空格
 
 	// endpoint表

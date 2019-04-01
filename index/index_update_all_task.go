@@ -62,10 +62,14 @@ func GetConcurrentOfUpdateIndexAll() int {
 	return ConcurrentOfUpdateIndexAll - semaIndexUpdateAllTask.AvailablePermits()
 }
 
+// 通过http服务触发全量更新
 // 索引的全量更新
 func UpdateIndexAllByDefaultStep() {
 	UpdateIndexAll(DefaultUpdateStepInSec)
 }
+
+// 根据item，在endpoint、tag_endpoint、endpoint_counter表中创建或更新相应的记录
+// updateStepInSec时间之前的缓存数据在缓存中删除，不参与更新
 func UpdateIndexAll(updateStepInSec int64) {
 	// 减少任务积压,但高并发时可能无效(AvailablePermits不是线程安全的)
 	if semaIndexUpdateAllTask.AvailablePermits() <= 0 {
@@ -91,6 +95,8 @@ func UpdateIndexAll(updateStepInSec int64) {
 	proc.IndexUpdateAll.PutOther("updateCnt", cnt)
 }
 
+// 根据item，在endpoint、tag_endpoint、endpoint_counter表中创建或更新相应的记录
+// updateStepInSec时间之前的缓存数据在缓存中删除，不参与更新
 func updateIndexAll(updateStepInSec int64) int {
 	var ret int = 0
 	if indexedItemCache == nil || indexedItemCache.Size() <= 0 {
@@ -135,6 +141,7 @@ func updateIndexAll(updateStepInSec int64) int {
 	return ret
 }
 
+// 根据item，在endpoint、tag_endpoint、endpoint_counter表中创建或更新相应的记录
 // 根据item,更新db存储. 不用本地缓存 优化db访问频率.
 func updateIndexFromOneItem(item *cmodel.GraphItem, conn *sql.DB) error {
 	if item == nil {
@@ -144,6 +151,7 @@ func updateIndexFromOneItem(item *cmodel.GraphItem, conn *sql.DB) error {
 	endpoint := item.Endpoint
 	ts := item.Timestamp
 	var endpointId int64 = -1
+	// ON DUPLICATE KEY UPDATE: 先判断一条记录是否存在，存在则update，否则insert
 	sqlDuplicateString := " ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), ts=VALUES(ts)" //第一个字符是空格
 
 	// endpoint表

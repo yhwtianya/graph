@@ -15,6 +15,7 @@ import (
 	"github.com/open-falcon/graph/rrdtool"
 )
 
+// 接收退出信号，将各个组件进行优雅退出，然后再退出
 func start_signal(pid int, cfg *g.GlobalConfig) {
 	sigs := make(chan os.Signal, 1)
 	log.Println(pid, "register signal notify")
@@ -77,5 +78,6 @@ func main() {
 	// start http server
 	go http.Start()
 
+	// 优雅退出
 	start_signal(os.Getpid(), g.Config())
 }

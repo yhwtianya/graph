@@ -154,7 +154,7 @@ func getWts(key string, now int64) int64 {
 	return now + interval - (int64(hashKey(key)) % interval)
 }
 
-// 将数据插入key对应list
+// 将数据插入key对应list,如果不存在key对应的rrdfile则置GRAPH_F_MISS flag
 func (this *GraphItemMap) PushFront(key string,
 	item *cmodel.GraphItem, md5 string, cfg *g.GlobalConfig) {
 	if linkedList, exists := this.Get(key); exists {
