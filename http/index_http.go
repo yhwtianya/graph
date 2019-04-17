@@ -54,6 +54,7 @@ func configIndexRoutes() {
 		RenderDataJson(w, "ok")
 	})
 
+	// 获取指标缓存在index的数据，仅一条
 	// index.cached
 	http.HandleFunc("/index/cache/", func(w http.ResponseWriter, r *http.Request) {
 		urlParam := r.URL.Path[len("/index/cache/"):]
@@ -88,6 +89,7 @@ func configIndexRoutes() {
 		RenderDataJson(w, item)
 	})
 
+	// Post获取指标缓存在index的数据，仅一条
 	http.HandleFunc("/v2/index/cache", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 

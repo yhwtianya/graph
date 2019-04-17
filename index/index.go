@@ -8,6 +8,8 @@ import (
 	"github.com/open-falcon/graph/g"
 )
 
+// 根据item，周期性在endpoint、tag_endpoint、endpoint_counter表中创建或更新相应的记录(增量更新)
+// 全量更新目前仅通过http接口调用
 // 初始化索引功能模块
 func Start() {
 	InitCache()
@@ -51,7 +53,7 @@ func ReceiveItem(item *cmodel.GraphItem, md5 string) {
 	unIndexedItemCache.Put(md5, NewIndexCacheItem(uuid, item))
 }
 
-// 获取indexedItemCache中对应缓存数据
+// 获取indexedItemCache中对应缓存数据,类型为GraphItem
 func GetIndexedItemCache(endpoint string, metric string, tags map[string]string, dstype string, step int) (r *cmodel.GraphItem, rerr error) {
 	itemDemo := &cmodel.GraphItem{
 		Endpoint: endpoint,

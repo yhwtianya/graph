@@ -15,11 +15,13 @@ import (
 )
 
 func configDebugRoutes() {
+	// 统计一小时内每个GraphItems索引下缓存的数据量
 	http.HandleFunc("/count", func(w http.ResponseWriter, r *http.Request) {
 		for i := 0; i < store.GraphItems.Size; i++ {
 			keys := store.GraphItems.KeysByIndex(i)
 			if len(keys) == 0 {
 				w.Write([]byte(fmt.Sprintf("%d\n", 0)))
+				// 不应该是continue吗??
 				return
 			}
 
@@ -82,6 +84,7 @@ func configDebugRoutes() {
 		RenderDataJson(w, "ok")
 	})
 
+	// Post形式接收上报数据
 	http.HandleFunc("/v2/api/recv", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -129,6 +132,7 @@ func configDebugRoutes() {
 	})
 }
 
+// rrd结构转GraphItem结构
 func convert2GraphItem(d *cmodel.MetaData) (*cmodel.GraphItem, error) {
 	item := &cmodel.GraphItem{}
 

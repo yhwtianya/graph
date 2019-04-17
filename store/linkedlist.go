@@ -63,6 +63,7 @@ func (this *SafeLinkedList) Len() int {
 // 取出并清空所有元素(元素转为GraphItem结构)
 // remain参数表示要给linkedlist中留几个元素
 // 在cron中刷磁盘的时候要留一个，用于创建数据库索引
+// 插入时是新数据在头部,PopAll时是新数据在尾部
 // 在程序退出的时候要一个不留的全部刷到磁盘
 func (this *SafeLinkedList) PopAll() []*cmodel.GraphItem {
 	this.Lock()
@@ -98,7 +99,7 @@ func (this *SafeLinkedList) PushAll(items []*cmodel.GraphItem) {
 	}
 }
 
-// 获取所有元素和flag
+// 获取所有元素和flag, 插入时是新数据在头部,FetchAll时是新数据在尾部
 //return为倒叙的?
 func (this *SafeLinkedList) FetchAll() ([]*cmodel.GraphItem, uint32) {
 	this.Lock()

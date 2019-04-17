@@ -51,6 +51,7 @@ var (
 	GraphLoadDbCnt    = nproc.NewSCounterQps("GraphLoadDbCnt") // load sth from db when query/info, tmp
 )
 
+// 返回所有计数器信息
 func GetAll() []interface{} {
 	ret := make([]interface{}, 0)
 

@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	_ = iota
-	IO_TASK_M_READ
-	IO_TASK_M_WRITE
-	IO_TASK_M_FLUSH
-	IO_TASK_M_FETCH
+	_               = iota
+	IO_TASK_M_READ  //读取整个rrdfile
+	IO_TASK_M_WRITE //写入新rrdfile
+	IO_TASK_M_FLUSH //追加到存在的rrdfile
+	IO_TASK_M_FETCH //读取rrdfile一段时间的统计数据
 )
 
 type io_task_t struct {
@@ -27,8 +27,11 @@ type io_task_t struct {
 }
 
 var (
-	Out_done_chan chan int        // 接收退出信号
-	io_task_chan  chan *io_task_t // io_task任务队列
+	Out_done_chan chan int // 接收退出信号
+	// io_task任务队列，任务是对本地rrdfile进行相应的读写操作
+	// migrate.go的fetch_rrd请求IO_TASK_M_WRITE，migrate_start调用net_task_worker，net_task_worker调用fetch_rrd
+	// rrdtool.go的ReadFile请求IO_TASK_M_READ、FlushFile请求IO_TASK_M_FLUSH、Fetch请求IO_TASK_M_FETCH
+	io_task_chan chan *io_task_t
 )
 
 func init() {
@@ -36,7 +39,7 @@ func init() {
 	io_task_chan = make(chan *io_task_t, 16)
 }
 
-// 定期FlushRRD，进行落盘
+// 定期FlushRRD，将store.GraphItems进行落盘
 func syncDisk() {
 	// 启动后不立即进行落盘
 	time.Sleep(time.Second * 300)
@@ -46,6 +49,7 @@ func syncDisk() {
 	for {
 		select {
 		case <-ticker:
+			// 每次仅对一个index的数据进行落盘
 			idx = idx % store.GraphItems.Size
 			FlushRRD(idx, false)
 			idx += 1
@@ -81,13 +85,13 @@ func ioWorker() {
 		select {
 		case task := <-io_task_chan:
 			if task.method == IO_TASK_M_READ {
-				// 执行读文件任务
+				// 执行读整个rrdfile
 				if args, ok := task.args.(*readfile_t); ok {
 					args.data, err = ioutil.ReadFile(args.filename)
 					task.done <- err
 				}
 			} else if task.method == IO_TASK_M_WRITE {
-				// 执行写文件任务
+				// 执行写全新rrdfile任务
 				//filename must not exist
 				if args, ok := task.args.(*g.File); ok {
 					baseDir := file.Dir(args.Filename)
@@ -98,12 +102,12 @@ func ioWorker() {
 				}
 			} else if task.method == IO_TASK_M_FLUSH {
 				if args, ok := task.args.(*flushfile_t); ok {
-					// 将GraphItem数据追加到rrdfile
+					// 将GraphItem数据追加到存在的rrdfile
 					task.done <- flushrrd(args.filename, args.items)
 				}
 			} else if task.method == IO_TASK_M_FETCH {
 				if args, ok := task.args.(*fetch_t); ok {
-					// 直接从rrdfile读取某时间段的统计数据
+					// 直接从rrdfile读取某时间段的统计数据,旧数据在头部
 					args.data, err = fetch(args.filename, args.cf, args.start, args.end, args.step)
 					task.done <- err
 				}

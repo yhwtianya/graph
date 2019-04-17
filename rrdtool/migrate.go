@@ -21,10 +21,10 @@ import (
 
 // Net_task_t的Method取值类型
 const (
-	_ = iota
-	NET_TASK_M_SEND
-	NET_TASK_M_QUERY
-	NET_TASK_M_PULL
+	_                = iota
+	NET_TASK_M_SEND  // 将key对应数据发送到其他graph
+	NET_TASK_M_QUERY // 向其他graph执行查询
+	NET_TASK_M_PULL  // graph扩容迁移数据时如果落盘超时,则将数据保存到其原来所属graph,否则将对应graph数据落盘到本地
 )
 
 // Net_task数据机构
@@ -51,11 +51,13 @@ const (
 )
 
 var (
-	Consistent       *consistent.Consistent      // 一致性哈希
-	Net_task_ch      map[string]chan *Net_task_t //保存每个graph的net_task队列，key为graph节点名称
-	clients          map[string][]*rpc.Client    // 保存migrate的每个graph的rcpClient，key为graph节点名称
-	flushrrd_timeout int32                       //标记flushrrd操作是否超时，超时时间为time.Millisecond*g.FLUSH_DISK_STEP
-	stat_cnt         [STAT_SIZE]uint64           // 统计计数器数组
+	Consistent *consistent.Consistent // 一致性哈希
+	// 保存每个graph的net_task队列，key为graph节点名称，graph.go的Query，rrdtool.go的PullByKey进行写入
+	// Net_task_t均是网络任务，比如向其他graph发送、查询、获取对应的rrd数据,graph节点选取采用一致性哈希
+	Net_task_ch      map[string]chan *Net_task_t
+	clients          map[string][]*rpc.Client // 保存migrate的每个graph的rcpClient，key为graph节点名称
+	flushrrd_timeout int32                    //标记flushrrd操作是否超时，超时时间为time.Millisecond*g.FLUSH_DISK_STEP
+	stat_cnt         [STAT_SIZE]uint64        // 统计计数器数组
 )
 
 func init() {
@@ -94,18 +96,18 @@ func dial(address string, timeout time.Duration) (*rpc.Client, error) {
 	return rpc.NewClient(conn), err
 }
 
-// 启动数据迁移协程，监听Net_task_ch，执行Net_task
+// 启动graph扩容数据迁移协程，监听Net_task_ch，执行Net_task，向其他graph发送、查询、获取对应的rrd数据
 func migrate_start(cfg *g.GlobalConfig) {
 	var err error
 	var i int
 	if cfg.Migrate.Enabled {
 		Consistent.NumberOfReplicas = cfg.Migrate.Replicas
 
-		// 返回排序后的key
+		// 扩容前的graph节点列表,返回排序后的key
 		nodes := cutils.KeysOfMap(cfg.Migrate.Cluster)
 		for _, node := range nodes {
 			addr := cfg.Migrate.Cluster[node]
-			// 加入一致性哈希，用于数据打散后迁移过程中的稳定性
+			// 加入一致性哈希，保证数据在graph节点的稳定性,PullByKey中调用了Consistent.Get
 			Consistent.Add(node)
 			Net_task_ch[node] = make(chan *Net_task_t, 16)
 			// 根据并发配置，每个node创建n个rpcClient
@@ -163,13 +165,13 @@ func net_task_worker(idx int, ch chan *Net_task_t, client **rpc.Client, addr str
 						atomic.AddUint64(&stat_cnt[SEND_S_SUCCESS], 1)
 					}
 				} else {
-					// 从目标graph获取数据并写入本地文件，目标graph也可以是本地
+					// 调用目标rpc Graph.GetRrd，从目标graph获取数据内容，通知io_task_chan写入本地rrdfile
 					if err = fetch_rrd(client, task.Key, addr); err != nil {
 						if os.IsNotExist(err) {
 							pfc.Meter("migrate.scprrd.null", 1)
-							//文件不存在时，直接将缓存数据刷入本地
 							atomic.AddUint64(&stat_cnt[FETCH_S_ISNOTEXIST], 1)
 							store.GraphItems.SetFlag(task.Key, 0)
+							//其他graph不存在此rrdfile，直接将缓存数据刷入本地
 							CommitByKey(task.Key)
 						} else {
 							pfc.Meter("migrate.scprrd.err", 1)
@@ -177,7 +179,7 @@ func net_task_worker(idx int, ch chan *Net_task_t, client **rpc.Client, addr str
 							atomic.AddUint64(&stat_cnt[FETCH_S_ERR], 1)
 						}
 					} else {
-						// fetch_rrd失败，无法落盘？
+						// fetch_rrd成功，落盘成功
 						pfc.Meter("migrate.scprrd.ok", 1)
 						atomic.AddUint64(&stat_cnt[FETCH_S_SUCCESS], 1)
 					}
@@ -216,7 +218,7 @@ func reconnection(client **rpc.Client, addr string) {
 	}
 }
 
-// 向其他graph执行查询
+// 调用目标rpc Graph.Query，向其他graph执行查询
 func query_data(client **rpc.Client, addr string,
 	args interface{}, resp interface{}) error {
 	var (
@@ -238,7 +240,7 @@ func query_data(client **rpc.Client, addr string,
 	return err
 }
 
-// 将key对应数据发送给对应graph
+// 调用目标rpc Graph.Send，将key对应数据发送给对应graph
 func send_data(client **rpc.Client, key string, addr string) error {
 	var (
 		err  error
@@ -290,7 +292,7 @@ out:
 
 }
 
-// 从目标graph获取数据并写入本地文件
+// 调用目标rpc Graph.GetRrd，从目标graph获取数据内容，通知io_task_chan写入本地rrdfile
 func fetch_rrd(client **rpc.Client, key string, addr string) error {
 	var (
 		err      error
@@ -316,11 +318,13 @@ func fetch_rrd(client **rpc.Client, key string, addr string) error {
 	filename = g.RrdFileName(cfg.RRD.Storage, md5, dsType, step)
 
 	for i = 0; i < 3; i++ {
+		// 从目标graph读取rrdfile内容
 		err = rpc_call(*client, "Graph.GetRrd", key, &rrdfile,
 			time.Duration(cfg.CallTimeout)*time.Millisecond)
 
 		if err == nil {
 			// 生成io_task加入io_task_chan队列
+			// 写入本地rrdfile
 			done := make(chan error, 1)
 			io_task_chan <- &io_task_t{
 				method: IO_TASK_M_WRITE,

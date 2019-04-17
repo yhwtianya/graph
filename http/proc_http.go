@@ -10,7 +10,7 @@ import (
 )
 
 func configProcRoutes() {
-	// counter
+	// counter 获取所有计数器信息
 	http.HandleFunc("/counter/all", func(w http.ResponseWriter, r *http.Request) {
 		RenderDataJson(w, proc.GetAll())
 	})
@@ -41,6 +41,7 @@ func configProcRoutes() {
 		RenderDataJson(w, store.GetAllItems(cutils.Checksum(endpoint, metric, tags)))
 	})
 
+	// 获取指标的最新3条数据
 	http.HandleFunc("/v2/history", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -66,6 +67,7 @@ func configProcRoutes() {
 		RenderDataJson(w, store.GetAllItems(cutils.Checksum(endpoint, metric, tags)))
 	})
 
+	// 获取指标的最新1条数据
 	// items.last
 	http.HandleFunc("/last/", func(w http.ResponseWriter, r *http.Request) {
 		urlParam := r.URL.Path[len("/last/"):]
@@ -87,6 +89,7 @@ func configProcRoutes() {
 		RenderDataJson(w, store.GetLastItem(cutils.Checksum(endpoint, metric, tags)))
 	})
 
+	// Post形式获取指标的最新1条数据
 	http.HandleFunc("/v2/last", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 

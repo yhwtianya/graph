@@ -42,11 +42,11 @@ type GlobalConfig struct {
 	RRD         *RRDConfig  `json:"rrd"`
 	DB          *DBConfig   `json:"db"`
 	CallTimeout int32       `json:"callTimeout"`
-	Migrate     struct {
+	Migrate     struct {    //扩容graph时历史数据自动迁移
 		Concurrency int               `json:"concurrency"` //number of multiple worker per node
-		Enabled     bool              `json:"enabled"`
-		Replicas    int               `json:"replicas"`
-		Cluster     map[string]string `json:"cluster"`
+		Enabled     bool              `json:"enabled"`     //表示graph是否处于数据迁移状态
+		Replicas    int               `json:"replicas"`    //一致性hash副本数,必须和transfer的配置中保持一致
+		Cluster     map[string]string `json:"cluster"`     //未扩容前老的graph实例列表
 	} `json:"migrate"`
 }
 

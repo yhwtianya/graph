@@ -34,7 +34,7 @@ const (
 
 // SafeLinkedList的Flag类型
 const (
-	GRAPH_F_MISS uint32 = 1 << iota // 不存在对应rrd文件
+	GRAPH_F_MISS uint32 = 1 << iota // 本地不存在对应rrd文件
 	GRAPH_F_ERR
 	GRAPH_F_SENDING // 发送中
 	GRAPH_F_FETCHING

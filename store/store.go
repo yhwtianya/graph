@@ -12,7 +12,8 @@ import (
 	"github.com/open-falcon/graph/g"
 )
 
-// 内存中采用一致性哈希，保存所有的GraphItem
+// 内存中采用一致性哈希，保存所有的GraphItem，比如rpc Send接口
+// GraphItems列表元素最前面是最新数据
 var GraphItems *GraphItemMap
 
 type GraphItemMap struct {
@@ -116,6 +117,7 @@ func (this *GraphItemMap) SetFlag(key string, flag uint32) error {
 }
 
 // 取出并清空对应key的所有GraphItem元素
+// 插入时是新数据在头部,PopAll时是新数据在尾部
 func (this *GraphItemMap) PopAll(key string) []*cmodel.GraphItem {
 	this.Lock()
 	defer this.Unlock()
@@ -127,6 +129,7 @@ func (this *GraphItemMap) PopAll(key string) []*cmodel.GraphItem {
 	return sl.PopAll()
 }
 
+// 获取所有元素和flag, 插入时是新数据在头部,FetchAll时是新数据在尾部
 func (this *GraphItemMap) FetchAll(key string) ([]*cmodel.GraphItem, uint32) {
 	this.RLock()
 	defer this.RUnlock()

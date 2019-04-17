@@ -40,6 +40,7 @@ type readfile_t struct {
 	data     []byte // 文件内容
 }
 
+// 负责执行远程和本地任务,负责内存数据落盘、graph扩容数据迁移
 func Start() {
 	cfg := g.Config()
 	var err error
@@ -49,10 +50,10 @@ func Start() {
 		log.Fatalln("rrdtool.Start error, bad data dir "+cfg.RRD.Storage+",", err)
 	}
 
-	// 启动数据迁移，监听Net_task_ch，执行Net_task
+	// 启动graph扩容数据迁移，监听Net_task_ch，执行Net_task
 	migrate_start(cfg)
 
-	// 定期FlushRRD，进行落盘
+	// 定期FlushRRD，将store.GraphItems进行落盘
 	// sync disk
 	go syncDisk()
 	//读取io_task_chan队列任务，执行io_task
@@ -178,7 +179,7 @@ func FlushFile(filename string, items []*cmodel.GraphItem) error {
 	return <-done
 }
 
-// 发送io_task任务，读取某时间段的统计数据
+// 发送io_task任务，直接从本地rrdfile读取某时间段的统计数据,旧数据在头部
 func Fetch(filename string, cf string, start, end int64, step int) ([]*cmodel.RRDData, error) {
 	done := make(chan error, 1)
 	task := &io_task_t{
@@ -197,7 +198,7 @@ func Fetch(filename string, cf string, start, end int64, step int) ([]*cmodel.RR
 	return task.args.(*fetch_t).data, err
 }
 
-// 直接从rrdfile读取某时间段的统计数据
+// 直接从rrdfile读取某时间段的统计数据,旧数据在头部
 func fetch(filename string, cf string, start, end int64, step int) ([]*cmodel.RRDData, error) {
 	start_t := time.Unix(start, 0)
 	end_t := time.Unix(end, 0)
@@ -258,12 +259,12 @@ func CommitByKey(key string) {
 	if len(items) == 0 {
 		return
 	}
-	// 发送io_task任务，写入rrdfile，等待任务完成
+	// 发送io_task任务，追加写入rrdfile，等待任务完成
 	FlushFile(filename, items)
 }
 
-// 对该key的pull任务放入任务队列，实现非阻塞执行pull
-// pull的作用是如果本地有对应rrdfile则将key对应的数据拉到本地进行落盘，此时如果落盘超时，将数据发送到其他graph
+// 对该key的pull任务放入net_task任务队列，实现非阻塞执行pull
+// pull的作用是在graph扩容迁移数据时,如果本地有对应rrdfile则将key对应的数据拉到本地进行落盘，此时如果落盘超时，将数据发送到原graph
 func PullByKey(key string) {
 	done := make(chan error)
 
