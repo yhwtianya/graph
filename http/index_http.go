@@ -10,7 +10,7 @@ import (
 )
 
 func configIndexRoutes() {
-	// 触发索引全量更新, 同步操作
+	// 触发索引全量更新, 同步操作,task模块会调用这里
 	http.HandleFunc("/index/updateAll", func(w http.ResponseWriter, r *http.Request) {
 		go index.UpdateIndexAllByDefaultStep()
 		RenderDataJson(w, "ok")

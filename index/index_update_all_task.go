@@ -62,7 +62,7 @@ func GetConcurrentOfUpdateIndexAll() int {
 	return ConcurrentOfUpdateIndexAll - semaIndexUpdateAllTask.AvailablePermits()
 }
 
-// 通过http服务触发全量更新
+// 通过http服务触发全量更新,task模块调用
 // 索引的全量更新
 func UpdateIndexAllByDefaultStep() {
 	UpdateIndexAll(DefaultUpdateStepInSec)

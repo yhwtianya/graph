@@ -17,7 +17,7 @@ var (
 // mysql 连接
 var DB *sql.DB
 
-// 初始化DB、dbConnMap
+// 初始化DB、dbConnMap。注意这里连接的是graph库
 func InitDB() {
 	var err error
 	DB, err = makeDbConn()
@@ -29,7 +29,7 @@ func InitDB() {
 	log.Println("g.InitDB ok")
 }
 
-// 按名称获取mysql连接,如果名称对应的连接，没有则创建连接
+// 按名称获取mysql连接,如果名称对应的连接，没有则创建连接。注意这里连接的是graph库
 func GetDbConn(connName string) (c *sql.DB, e error) {
 	dbLock.Lock()
 	defer dbLock.Unlock()
